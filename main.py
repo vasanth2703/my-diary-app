@@ -8,7 +8,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-import io
+import soundfile as sf
+from io import BytesIO
 import speech_recognition as sr
 
 app = FastAPI(title="Personalized Diary Backend")
@@ -64,19 +65,22 @@ def upload_to_drive(service, file_name, file_content, mime_type):
     ).execute()
     return file.get('id')
 
-def speech_to_text(audio_file):
-    """Convert audio to text"""
+def speech_to_text(audio_bytes):
+    """Convert audio to text using alternative method"""
     recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_file) as source:
-        audio_data = recognizer.record(source)
+    
+    # Save audio bytes to temporary file
+    with BytesIO(audio_bytes) as audio_file:
         try:
-            text = recognizer.recognize_google(audio_data)
-            return text
-        except sr.UnknownValueError:
-            return "Speech was unintelligible"
-        except sr.RequestError:
-            return "Could not process speech recognition"
-
+            with sf.SoundFile(audio_file) as sound_file:
+                audio_data = recognizer.record(
+                    sr.AudioFile(sf.SoundFile(audio_file))
+                )
+                text = recognizer.recognize_google(audio_data)
+                return text
+        except Exception as e:
+            return f"Speech recognition error: {str(e)}"
+            
 @app.post("/login")
 async def login(token: str):
     try:
